@@ -1,0 +1,98 @@
+---
+title: "assignment_3"
+author: "David Langenohl"
+date: "08.11.2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE}
+## Load packages
+libs = c("link2GI",
+         "ggplot2",
+         "reshape2",
+         "cowplot")
+lapply(libs, require, character.only = TRUE)
+```
+
+```{r, include=FALSE}
+## Setting up the working environment.
+# Set pathes -------------------------------------------------------------------
+if(Sys.info()[4] == "PC"){
+  username <- "David"
+} else if(Sys.info()[4] == "DESKTOP-LKKGU08"){
+  username <- "hhans"
+} else{print("You need to configure the filepath_base yourself!")}
+## the if-else-loop sets the filepath depending on the system used ("PC" = PC, "DESKTOP-LKKGU08" = Laptop)
+
+filepath_base <- paste0("C:/Users/", username, "/Google Drive/Studium/WiSe19/mpg-envinsys-plygrnd/data_analysis/")
+
+# Set project specific subfolders -------------------------------------------------------------------
+project_folders <- c("data/", "tmp/", "output/", "src/", "src/assignment_3/")
+
+envrmt <- initProj(projRootDir = filepath_base,
+                  projFolders = project_folders, 
+                  path_prefix = "path_", 
+                  global = FALSE)
+```
+
+1. Read the data provided in the Excel file and “isolate” the tabulated information into a *data.frame* class.
+```{r}
+df <- read.table(paste0(envrmt$path_data, "hessen_holzeinschlag_1997-2014.csv"), 
+                 skip = 4, 
+                 header = T,
+                 sep = ";",
+                 dec = ".") 
+
+df <- df[-c(nrow(df)),] #delete last row, as it does not contain data we want
+```
+
+2. Create a simple visualization which gives a quick, temporally non explicit and descriptive statistical overview of the harvest by tree type and as a total over all trees (i.e. a similar kind of information as provided by the summary function).
+```{r, fig.width = 10 ,fig.height = 12}
+boxplot <- boxplot(df[,-1], row.names = T, 
+                   main = "Wood Harvest in Hessen from 1997 to 2014",
+                   xlab = "tree species",
+                   ylab = "amount of harvested wood")
+```
+
+3. Create another visualization which - in the same figure panel - shows how each beech harvest over the time span is related to each of the oak, pine, spruce and colored wood harvests in a 2 by 2 grid (i.e. arrange the figures in a 2 columns and 2 rows layout).
+```{r, fig.width = 12 ,fig.height = 10}
+#fig.width and fig.height are used to expand the size of the image, when it is knitted
+#packages used: ggplot2, reshape2, cowplot (as mfrow does not work with ggplot2 plots)
+df2 <- melt(df[, c("FWJ", "Buche", "Eiche")], id.vars = "FWJ")
+names(df2) <- c("Year", "Tree_species", "Number_of_trees_harvested")
+plot1 <- ggplot(df2, aes(x=Year, y = Number_of_trees_harvested, fill = Tree_species)) + 
+  geom_bar(stat = "identity", position = "dodge") +
+  theme(axis.text.x = element_text(angle = -45))
+
+df2 <- melt(df[, c("FWJ", "Buche", "Buntholz")], id.vars = "FWJ")
+names(df2) <- c("Year", "Tree_species", "Number_of_trees_harvested")
+plot2 <- ggplot(df2, aes(x=Year, y = Number_of_trees_harvested, fill = Tree_species)) + 
+  geom_bar(stat = "identity", position = "dodge") +
+  theme(axis.text.x = element_text(angle = -45))
+
+df2 <- melt(df[, c("FWJ", "Buche", "Fichte")], id.vars = "FWJ")
+names(df2) <- c("Year", "Tree_species", "Number_of_trees_harvested")
+plot3 <- ggplot(df2, aes(x=Year, y = Number_of_trees_harvested, fill = Tree_species)) + 
+  geom_bar(stat = "identity", position = "dodge") +
+  theme(axis.text.x = element_text(angle = -45))
+
+df2 <- melt(df[, c("FWJ", "Buche", "Kiefer")], id.vars = "FWJ")
+names(df2) <- c("Year", "Tree_species", "Number_of_trees_harvested")
+plot4 <- ggplot(df2, aes(x=Year, y = Number_of_trees_harvested, fill = Tree_species)) + 
+  geom_bar(stat = "identity", position = "dodge") +
+  theme(axis.text.x = element_text(angle = -45))
+
+ggdraw(xlim = c(0,2), ylim = c(0,1.25)) +
+  draw_plot(plot1, x = 0, y = .5, width = 1, height = .5) +
+  draw_plot(plot2, x = 1, y = .5, width = 1, height = .5) +
+  draw_plot(plot3, x = 0, y = 0, width = 1, height = .5) +
+  draw_plot(plot4, x = 1, y = 0, width = 1, height = .5)  
+```
+
+4. Include your opinion on what could be the key message of these figures in two sentence max.
+
+Die Fichte ist die wichtigste Baumart der hessischen Forstwirtschaft, dicht gefolgt von der Buche. Die deutlichen Schwankungen in der Fichtenernte, zu sehen in Balkendiagramm und Boxplot, mit einem Extremwert im Jahre 2007, deuten darauf hin, dass die Fichte anfälliger gegenüber Sturm (bspw. "Kyrill", 2007) und anderen Extremwetterlagen ist, als es bei der Buche der Fall ist.
