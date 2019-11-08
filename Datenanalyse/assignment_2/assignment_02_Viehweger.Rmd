@@ -1,0 +1,147 @@
+---
+title: "Assignment 2"
+author: "Jonas Viehweger"
+date: "29 Oktober 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1
+
+Implement an if-then-else statement which prints “larger” if the number provided as variable n is larger than 1 and “equal or smaller” otherwise.
+
+```{r}
+n <- 1
+if(n > 1){
+  print("larger")
+} else {
+  print("equal or smaller")
+}
+```
+
+## 2
+
+Extent a copy of the above statement (i.e. copy the entire if-then-else statement and include it a second time in your script in order to preserve both versions) which returns “equal” and “smaller” explicitly in addition to “larger”.
+
+```{r}
+if(n > 1){
+  print("larger")
+} else if(n == 1) {
+  print("equal")
+} else {
+  print("smaller")
+}
+```
+
+## 3
+
+Implement a if-then-else statement which prints “even” if the number provided as variable n is even and which prints “odd” otherwise.
+
+```{r}
+n <- 1
+if(n %% 2 == 1){
+  print("odd")
+} else {
+  print("even")
+}
+```
+
+## 4
+
+Copy the extended larger/equal/smaller if-then-else statement and include it into a for loop which shows that all three options are actually implemented in a correct manner by iterating over n from a number which is smaller 1, exactly 1 and larger than 1.
+
+```{r}
+for(n in 0:2) {
+  if(n > 1){
+    print("larger")
+  } else if(n == 1) {
+    print("equal")
+  } else {
+    print("smaller")
+  }
+}
+```
+
+## 5
+
+Extent a copy of the above loop and modify the loop and if-then-else statement in such a way, that the information on “larger” etc. is not printed on the screen but saved within a vector (i.e. a variable which will hold all three statements in the end). Print the content of this vector after the loop.
+
+```{r}
+result <- character()
+
+for(n in 0:2) {
+  if(n > 1){
+    result <- c(result, "larger")
+  } else if(n == 1) {
+    result <- c(result, "equal")
+  } else {
+    result <- c(result, "smaller")
+  }
+}
+
+print(result)
+```
+
+## 6
+
+Extent a copy of the above modified loop in such a way, that the results are not saved in a vector but a list. Print the content of this list after the loop.
+
+```{r}
+result <- list()
+
+for(n in seq(0.5,1.5,0.1)) {
+  if(n > 1){
+    result$larger <- c(result[["larger"]], n)
+  } else if(n == 1) {
+    result$equal <- c(result[["equal"]], n)
+  } else {
+    result$smaller <- c(result[["smaller"]], n)
+  }
+}
+
+print(result)
+```
+
+## 7
+
+Change the above modified loop in such a way, that the iteration is controlled by a lapply not by a for-loop. Save the returning information from the lapply function in a variable and print the content of this variable after the loop.
+
+```{r}
+result <- list()
+n <- seq(0.5,1.5,0.1)
+
+result <- lapply(n, function(n){
+  if(n > 1){
+    result <- "larger"
+  } else if(n == 1) {
+    result <- "equal"
+  } else {
+    result <- "smaller"
+  }
+})
+
+print(result)
+```
+
+## 8
+
+Finally change the above variable (i.e. do not modify the loop anymore but just include one more line) in such a way that the content is not printed as a nested list but a vector (i.e. flatten the list).
+
+```{r}
+result <- lapply(seq(0.5,1.5,0.1), function(n){
+  if(n > 1){
+    result <- list("larger" = n)
+  } else if(n == 1) {
+    result <- list("equal" = n)
+  } else {
+    result <- list("smaller" = n)
+  }
+})
+
+flattenedResults <- unlist(result)
+
+print(flattenedResults)
+```

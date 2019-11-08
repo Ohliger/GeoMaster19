@@ -1,0 +1,82 @@
+---
+title: "Assignment 03"
+author: "Jonas Viehweger"
+date: "5 11 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#setwd("C:/Users/Jonas/Google Drive/Studium/Marburg/WS19/data_analysis")
+knitr::opts_knit$set(root.dir = "C:/Users/Jonas/Google Drive/Studium/Marburg/WS19/data_analysis")
+```
+
+## 1
+
+Read the data provided in the Excel file and “isolate” the tabulated information into a data.frame class.
+
+```{r}
+df = read.table("data/assignment_03/hessen_holzeinschlag_1997-2014.csv", sep = ";", header = T, skip = 4, nrows = 18)
+class(df)
+```
+
+## 2
+
+Create a simple visualization which gives a quick, temporally non explicit and descriptive statistical overview of the harvest by tree type and as a total over all trees (i.e. a similar kind of information as provided by the summary function).
+
+```{r}
+boxplot(df[,2:7], xlab = "Baumart", ylab = "Holzeinschlag", main = "Boxplots pro Baumart")
+```
+
+## 3
+
+Create another visualization which - in the same figure panel - shows how each beech harvest over the time span is related to each of the oak, pine, spruce and colored wood harvests in a 2 by 2 grid (i.e. arrange the figures in a 2 columns and 2 rows layout).
+
+```{r}
+par(mfrow = c(2,2))
+
+plot(df$Buche, df$Eiche)
+abline(lm(df$Eiche~df$Buche), col="red")
+plot(df$Buche, df$Kiefer)
+abline(lm(df$Kiefer~df$Buche), col="red")
+plot(df$Buche, df$Fichte)
+abline(lm(df$Fichte~df$Buche), col="red")
+plot(df$Buche, df$Buntholz)
+abline(lm(df$Buntholz~df$Buche), col="red")
+```
+
+## 4
+
+Include your opinion on what could be the key message of these figures in two sentence max.
+
+```{r}
+par(mfrow = c(2,2))
+
+barplot(t(as.matrix(df[,c(3,2)])), 
+        beside = TRUE,
+        names.arg = df$FWJ,
+        legend.text = TRUE,
+        ylab = "number of individuals",
+        xlab = "Length class (cm)")
+
+barplot(t(as.matrix(df[,c(3,4)])), 
+        beside = TRUE,
+        names.arg = df$FWJ,
+        legend.text = TRUE,
+        ylab = "number of individuals",
+        xlab = "Length class (cm)")
+
+barplot(t(as.matrix(df[,c(3,5)])), 
+        beside = TRUE,
+        names.arg = df$FWJ,
+        legend.text = TRUE,
+        ylab = "number of individuals",
+        xlab = "Length class (cm)")
+
+barplot(t(as.matrix(df[,c(3,6)])), 
+        beside = TRUE,
+        names.arg = df$FWJ,
+        legend.text = TRUE,
+        ylab = "number of individuals",
+        xlab = "Length class (cm)")
+```
