@@ -1,0 +1,70 @@
+---
+title: "Hausaufgabe 1"
+author: "Carl Ziereisen"
+date: "29 Oktober 2019"
+output: html_document
+---
+
+
+
+Step1:
+```{r}
+a <- 2
+b <- 5
+```
+
+Step2:
+```{r}
+r1 <- a+b
+r2 <- a-b
+r3 <- a*b
+r4 <- a/b
+```
+
+Step3:
+```{r}
+v1 <- c(r1,r2,r3,r4)
+```
+
+Step4:
+```{r}
+r5 <- a**b
+v1[5] <- r5
+```
+
+Step5:
+```{r}
+print(v1)
+```
+
+Step6:
+```{r}
+v2 <- c("sum", "diffrence", "product", "ratio", "power")
+```
+
+Step7:
+```{r}
+print(v2)
+```
+
+Step8:
+```{r}
+df <- data.frame(v2, v1)
+print(df)
+```
+
+Step9: 
+```{r}
+colnames(df) <- c("Operation", "Results")
+```
+
+Step10:
+```{r}
+print(df)
+```
+
+Step11:
+```{r}
+print(df[3,1])
+```
+
