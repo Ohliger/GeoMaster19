@@ -1,0 +1,61 @@
+---
+title: "assignment_01"
+author: "Etienne Stadler"
+date: "31 10 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Aufgabe 1: Assign the value of 2 to a variable called a and the value of 5 to a variable called b.
+```{r}
+a <- 2
+b <- 5
+```
+Aufgabe 2: Compute the sum, difference, product and ratio of a and b (a always in the first place) and store the results to four different variables called r1, r2, r3, and r4.
+```{r}
+r1 <- a+b
+r2 <- a-b
+r3 <- a*b
+r4 <- a/b
+```
+Aufgabe 3: Create a vector v1 which contains the values stored within the four variables from step 2.
+```{r}
+v1 <- c(r1,r2,r3,r4)
+```
+Aufgabe 4: Add a fifth entry to vector v1 which represents a by the power of b (i.e. a**b).
+```{r}
+r5 <- a**b
+v1[5] <- r5
+```
+Aufgabe 5: Show the content of vector v1 (e.g. use the print function or just type the variable name in a separate row).
+```{r}
+print(v1)
+```
+Aufgabe 6: Create a second vector v2 which contains information on the type of mathematical operation used to derive the five results. Hence this vector should have five entries of values sum, difference,…
+```{r}
+v2 <- c("sum","diffrence","product","ratio","power")
+```
+Aufgabe 7: Show the content of vector v2.
+```{r}
+print(v2)
+```
+Aufgabe 8: Combine the two vectors v1 and v2 into a data frame called df. Each vector should become one column of the data frame so you will end up with a data frame having 5 rows and 2 columns.
+```{r}
+df <- data.frame(v2,v1)
+print(df)
+```
+Aufgabe 9: Make sure that the column with the data of v1 is named Results and v2 is named Operation.
+```{r}
+colnames(df) <- c("Operation","Results")
+```
+Aufgabe 10: Show the entire content of df.
+```{r}
+print(df)
+```
+Aufgabe 11: Show just the entry of the 3 row and 1 column.
+```{r}
+df[3,1]
+```

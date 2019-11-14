@@ -1,0 +1,55 @@
+---
+title: "assignment_03"
+author: "Etienne Stadler"
+date: "5 11 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+1: Read the data provided in the Excel file and “isolate” the tabulated information into a data.frame class.
+```{r}
+df <- read.table("C:/Users/etien/Documents/GitHub/mpg-envinsys-plygrnd/data_analysis/input/hessen_holzeinschlag_1997-2014.csv", sep = ";",header = TRUE,skip = 4,dec = ",")
+
+str(df)
+```
+2: Create a simple visualization which gives a quick, temporally non explicit and descriptive statistical overview of the harvest by tree type and as a total over all trees (i.e. a similar kind of information as provided by the summary function).
+```{r}
+v <- df[,c(2:7)]
+
+boxplot(v,main="Wald- und Forstwirtschaft in Hessen", xlab="Baumart", ylab="Holzeinschlag")
+
+```
+
+3: Create another visualization which - in the same figure panel - shows how each beech harvest over the time span is related to each of the oak, pine, spruce and colored wood harvests in a 2 by 2 grid (i.e. arrange the figures in a 2 columns and 2 rows layout).
+
+```{r}
+par(mfrow = c(2,2))
+
+barplot(t(as.matrix(df[c(3,2)])), width = 8,beside = TRUE, space = c(0,0.5) ,names.arg = df[,1],legend.text = TRUE,
+        ylab = "Holzeinschlag",
+        xlab = "Jahr")
+
+
+
+barplot(t(as.matrix(df[c(3,4)])), width = 8,beside = TRUE, space = c(0,0.5) ,names.arg = df[,1],legend.text = TRUE,
+        ylab = "Holzeinschlag",
+        xlab = "Jahr")
+
+barplot(t(as.matrix(df[c(3,5)])), width = 8,beside = TRUE, space = c(0,0.5) ,names.arg = df[,1],legend.text = TRUE,
+        ylab = "Holzeinschlag",
+        xlab = "Jahr")
+
+
+barplot(t(as.matrix(df[c(3,6)])), width = 8,beside = TRUE, space = c(0,0.5) ,names.arg = df[,1],legend.text = TRUE,
+        ylab = "Holzeinschlag",
+        xlab = "Jahr")
+```
+
+4: Include your opinion on what could be the key message of these figures in two sentence max.
+```{r}
+#Die Abbildungen geben zu erkennen, dass die Fichte, noch vor der Buche, in der Wald- und Forstwirtschaft in Hessen die wichtigste Baumart darstellt. Außerdem wird die größere Anfälligkeit der Fichte gegenüber Extremereignissen sichtbar. 
+```
+
