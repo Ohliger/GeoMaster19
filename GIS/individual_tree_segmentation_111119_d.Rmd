@@ -1,0 +1,116 @@
+---
+title: "individual_tree_segmentation"
+author: "David Langenohl"
+date: "11.11.2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r, include = F}
+#Load packages, needed for the tasks.
+#The needed packages are written into *libs*, the *lapply* loops gives out, if they are installed (if not, do it individually) and, if so, reads #them in.
+
+## Load packages
+libs = c("link2GI",
+         "raster",
+         "lidR",
+         "EBImage")
+lapply(libs, require, character.only = TRUE)
+```
+
+```{r, include = F}
+#Set the projects home directory and the folder pathes. The pathes can than be reached by (e.g) *envrmt$filepath_base*.
+
+## Set pathes -------------------------------------------------------------------
+if(Sys.info()[4] == "PC"){
+  username <- "David"
+} else if(Sys.info()[4] == "DESKTOP-LKKGU08"){
+  username <- "hhans"
+} else{print("You need to configure the filepath_base yourself!")}
+### the if-else-loop sets the filepath depending on the system used ("PC" = PC, "DESKTOP-LKKGU08" = Laptop)
+
+filepath_base <- paste0("C:/Users/", username, "/Google Drive/Studium/WiSe19/GIS_Fernerkundung")
+
+## Set project specific subfolders -------------------------------------------------------------------
+project_folders <- c("output/", "src/", "data/")
+
+envrmt <- initProj(projRootDir = filepath_base,
+                   projFolders = project_folders, 
+                   path_prefix = "path_", 
+                   global = FALSE)
+```
+
+Read and plot las-file
+```{r}
+# following this tutorial: https://github.com/Jean-Romain/lidR/wiki/Segment-individual-trees-and-compute-metrics
+
+las <- readLAS(paste0(envrmt$path_data, "session_3/U4765630.laz"))
+plot(las)
+```
+
+Classify ground points and height normalize the dataset.
+```{r}
+las = lasground(las, csf()) #works fine without the need to tune the parameters
+#plot(las, color = "Classification")
+las = lasnormalize(las, tin())
+plot(las)
+```
+
+There are several methods to segment the tree in lidR the following will use a watershed, that is far to be the best, but is good enough for this easy to segment example.
+First step: create a canopy height model (CHM).
+```{r, fig.width = 10 ,fig.height = 10}
+algo = pitfree(thresholds = c(0,10,20,30,40,50), subcircle = 0.2)
+chm  = grid_canopy(las, 0.5, algo)
+plot(chm, col = height.colors(50))
+```
+
+Optionally, the CHM can be smoothed by using the *raster* package (not faster!)
+```{r, fig.width = 10, fig.height = 10}
+# smoothing post-process (e.g. two pass, 3x3 median convolution)
+ker = matrix(1,3,3)
+chm1 = focal(chm, w = ker, fun = median)
+chm1 = focal(chm1, w = ker, fun = median)
+
+plot(chm1, col = height.colors(50)) # check the image
+```
+
+The segmentation can now be achieved with lastrees. Here I chose the watershed algorithm with a threshold of 4 meters. The point cloud has been updated and each point now has a number that refers to an individual tree (treeID). Points that not trees are assigned the id value NA.
+```{r}
+##EBImage package is needed for watershed, needs to be installed via the bioconductor project package
+#install.packages("BiocManager")
+#BiocManager::install("EBImage")
+library(EBImage)
+
+algo = lidR::watershed(chm, th_tree = 4)
+las  = lastrees(las, algo)
+
+# remove points that are not assigned to a tree
+trees = lasfilter(las, !is.na(treeID))
+
+plot(trees, color = "treeID", colorPalette = pastel.colors(100)) #worked out pretty good!
+```
+
+Compute hulls.
+```{r}
+hulls  = tree_hulls(las, func = .stdmetrics)
+raster::spplot(hulls, "Z") # does not work; can not fix it right now
+```
+
+Optionally, the crowns can be plotted in a raster (if further processing shall be done with raster).In that case the function watershed can be used standalone:
+```{r, fig.width = 10, fig.height = 10}
+crowns = lidR::watershed(chm, th_tree = 4)()
+plot(crowns, col = pastel.colors(100))
+```
+
+Once you are working with rasters the lidR package is not implied anymore. User can rely on the raster package for further analysis. For example:
+```{r, fig.width = 10, fig.height = 10}
+contour = rasterToPolygons(crowns, dissolve = TRUE) # takes years to process (and way to much RAM)
+
+plot(chm, col = height.colors(50))
+plot(contour, add = T)
+```
+
