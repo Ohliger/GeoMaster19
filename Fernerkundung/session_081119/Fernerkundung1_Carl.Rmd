@@ -23,7 +23,7 @@ Aufgabe: Alle Satellitenbilder der Uniwalds in R laden und in ein Bild mit Merge
 aerial_files <- list.files(file.path(envrmt$path_data_aerial,"mof_aerial"))
 images <- list()
 
-shape <- st_read(file.path(envrmt$path_data_data_mo, "mof_vector_data/uwcWaldorte.shp"))
+shape <- st_read(file.path(envrmt$path_data_data_mo, "mof_vector_data/uwcKernbereich.shp"))
 
 
 for(i in 1:length(aerial_files)){
