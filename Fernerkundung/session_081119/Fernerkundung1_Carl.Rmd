@@ -1,0 +1,49 @@
+---
+title: "Fernerkundung1_Carl"
+author: "Carl Ziereisen"
+date: "12 November 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(raster)
+library(sf)
+```
+
+
+Aufgabe: Alle Satellitenbilder der Uniwalds in R laden und in ein Bild mit Merge verbinden.
+
+```{r, eval=FALSE}
+#Vorher Package(Raster) installieren und ausfuehren
+
+aerial_files <- list.files(file.path(envrmt$path_data_aerial,"mof_aerial"))
+images <- list()
+
+shape <- st_read(file.path(envrmt$path_data_data_mo, "mof_vector_data/uwcWaldorte.shp"))
+
+
+for(i in 1:length(aerial_files)){
+  image <- brick(paste0(envrmt$path_data_aerial,"mof_aerial/", aerial_files[i]))
+  image <- crop(image,shape)
+  images <- c(images, image)
+}
+
+images$fun <- min #Verwendung des min Wert fuer sich ueberlagernde Bereiche
+
+
+
+aerial_map_complete <- do.call(mosaic, images) # Bereinigung der einzelnen Teilbilder
+
+plotRGB(aerial_map_complete)
+
+
+```
+
+```{r, echo=FALSE}
+saveRDS(aerial_map_complete, paste0(envrmt$path_data_tmp, "aerial_map_complete.RDS"))
+```
+
