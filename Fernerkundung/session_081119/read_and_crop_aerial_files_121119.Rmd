@@ -1,0 +1,77 @@
+---
+title: "read and crop aerial files"
+author: "David Langenohl"
+date: "12 11 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE}
+## Load packages
+libs = c("link2GI",
+         "raster",
+         "sf")
+lapply(libs, require, character.only = TRUE)
+```
+
+```{r, include=FALSE}
+# Set pathes -------------------------------------------------------------------
+if(Sys.info()[4] == "PC"){
+  username <- "David"
+} else if(Sys.info()[4] == "DESKTOP-LKKGU08"){
+  username <- "hhans"
+} else{print("You need to configure the filepath_base yourself!")}
+## the if-else-loop sets the filepath depending on the system used ("PC" = PC, "DESKTOP-LKKGU08" = Laptop)
+
+filepath_base <- paste0("C:/Users/", username, "/Google Drive/Studium/WiSe19/Fernerkundung")
+
+# Set project specific subfolders -------------------------------------------------------------------
+project_folders <- c("log", "output/", "src/", "run",
+                     "data/", "data/aerial/", "data/data_mof/", "data/grass/", "data/lidar/","data/tmp/")
+
+envrmt <- initProj(projRootDir = filepath_base,
+                   projFolders = project_folders, 
+                   path_prefix = "path_", 
+                   global = FALSE)
+```
+
+Set rasterOptions
+```{r}
+rasterOptions(tmpdir = envrmt$path_data_tmp, progress = "text")
+```
+
+Load shapefile, that is used for cropping the aerial images. Then read in all images and crop them.
+```{r, eval = F}
+#  Load vector (shapefile; shape of the MOF)
+uwc <- st_read(file.path(envrmt$path_data_data_mof, "uwcWaldorte.shp")) #st_read part of "sf" package
+
+# Load all aerial files
+aerial_images = list.files(envrmt$path_data_aerial)
+
+# create ReadAndCrop function
+ReadAndCrop = function(in_path){
+  require(raster)
+  bricked = brick(file.path(envrmt$path_data_aerial,in_path))
+  return(crop(bricked, uwc))
+}
+
+aerial_bricks = lapply(aerial_images, ReadAndCrop) # slow, as only processed by one core; for multicore processing see other script
+
+# the following leads to the removal of whitespace in the aerial images
+aerial_bricks$fun = min
+aerial_bricks$na.rm = TRUE
+
+# Merge all raster images in the list and plot them 
+merged = do.call(mosaic, aerial_bricks)
+
+saveRDS(merged, paste0(envrmt$path_output, "uniwald_cropped.RDS"))
+```
+
+```{r, echo = F, fig.width = 10, fig.height = 10}
+uniwald_cropped <- readRDS(paste0(envrmt$path_output, "uniwald_cropped.RDS"))
+plotRGB(uniwald_cropped)
+```
+
