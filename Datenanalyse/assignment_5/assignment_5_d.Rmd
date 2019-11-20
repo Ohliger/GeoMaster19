@@ -1,0 +1,117 @@
+---
+title: "assignment_5"
+author: "David Langenohl"
+date: "19 11 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include = F}
+#Load packages, needed for the tasks.
+#The needed packages are written into *libs*, the *lapply* loops gives out, if they are installed (if not, do it individually) and, if so, reads #them in.
+
+## Load packages
+libs = c("link2GI",
+         "car")
+#lapply(libs, require, character.only = TRUE)
+
+for(i in libs){
+  if(lapply(i, require, character.only = TRUE) == F){
+    install.packages(i)
+    lapply(i, require, character.only = TRUE)
+  } else {}
+}
+```
+
+```{r, include = F}
+#Set the projects home directory and the folder pathes. The pathes can than be reached by (e.g) *envrmt$filepath_base*.
+
+## Set pathes -------------------------------------------------------------------
+if(Sys.info()[4] == "PC"){
+  username <- "David"
+} else if(Sys.info()[4] == "DESKTOP-LKKGU08"){
+  username <- "hhans"
+} else{print("You need to configure the filepath_base yourself!")}
+### the if-else-loop sets the filepath depending on the system used ("PC" = PC, "DESKTOP-LKKGU08" = Laptop)
+
+filepath_base <- paste0("C:/Users/", username, "/Google Drive/Studium/WiSe19/mpg-envinsys-plygrnd/data_analysis/")
+# if there are problems with your home directory, use "../" to get one folder back (i.e. get to directorys that lie before your home directory)
+
+## Set project specific subfolders -------------------------------------------------------------------
+project_folders <- c("output/", "src/", "data/", "tmp/")
+
+envrmt <- initProj(projRootDir = filepath_base,
+                   projFolders = project_folders, 
+                   path_prefix = "path_", 
+                   global = FALSE)
+```
+
+
+Plotting the linear regression model.
+
+```{r, echo = F}
+lu <- readRDS(paste0(envrmt$path_data, "lu_clean.RDS"))
+lu_lm <- lm(lu$Recreation ~ lu$Settlement)
+
+plot(lu$Recreation ~ lu$Settlement,
+     xlab = "Percentage of Settlement",
+     ylab = "Percentage of Recreation") %%
+regLine(lu_lm, col = "red")
+```
+
+
+Testing for heteroscedasticity and normal distribution of residuals.
+
+```{r, echo = F}
+# Heteroscedasticity: One of the important assumptions of linear regression is that, there should be no heteroscedasticity of residuals. In simpler terms, this means that the variance of residuals should not increase with fitted values of response variable
+
+par(mfrow=c(2,2)) # init 4 charts in 1 panel
+plot(lu_lm, which = c(1,3)) # correlations of fitted values and residuals
+plot(lu_lm, which = c(2))# QQ plot for testing for normal distribution
+hist(lu_lm$residuals, xlab = "Residuals", main = "Histogram of Residuals")
+
+shapiro.test(lu_lm$residuals) # p-value <0.05 implies that the distribution of data is significantly different from normal distribution and, hence, not normally distributed
+car::ncvTest(lu_lm) # p-value <0.05 implies the presence of heteroscedasticity (homoscedasticity would be Nullhypothesis)
+```
+
+So, what is the key message?
+The presence of heteroscedasticity and the absence of normal distribution of the residuals implies, that the varience of the residuals changes with increasing fitted values which disagrees with minimum assumptions for a bivariate linear regression.
+
+
+Now: testing for normal distribution of residuals of subsamples of the data set.
+
+```{r, echo = F}
+normdis_sub <- data.frame(subsample_no = seq(100), p_value = rep(NA, times = 100), normal_distribution = rep(NA, times = 100)) 
+
+for (i in seq(100)) {
+  subsample <- lu[sample(nrow(lu), 50), c("Settlement", "Recreation")] #randomly choose 50 value pairs form the data frame
+  lm_sub <- lm(subsample$Recreation ~ subsample$Settlement) # perform linear regression with subsample data
+  nortest_sub <-  shapiro.test(lm_sub$residuals) # check for normal distribution of residuals
+  normdis_sub[i, 2] <- nortest_sub$p.value # write p-value into vector
+  if(nortest_sub$p.value <= 0.05){
+    normdis_sub[i, 3] <- T
+  } else {
+    normdis_sub[i, 3] <- F
+  }
+}
+
+result_sub <- data.frame(distribution = c("normal", "not_normal"), 
+                         number_of_subsamples = c(sum(normdis_sub$normal_distribution == T), 
+                                                  sum(normdis_sub$normal_distribution == F))
+                         )
+
+barplot(height = result_sub$number_of_subsamples, 
+        names.arg = c("normal distributed", "not normal distributed"),
+        ylab = "number of subsamples",
+        ylim = c(0,100),
+        axisnames = T) %% 
+  text(0.68,result_sub$number_of_subsamples[1]+3, result_sub$number_of_subsamples[1]) %% #adding labels: text(x-coordinate, y-coordinate, text)
+  text(1.9,result_sub$number_of_subsamples[2]+3, result_sub$number_of_subsamples[2])
+
+print(result_sub)
+```
+
+Within the subsamples, a significantly higher part of samples' residuals exhibit a normal distribution, whereas few residuals of samples show no normal distribution. These findings contradict the findings of the analysis of the complete data set and, hence, hightlight the need of being critical, when testing for distributions and correlations of data. In case of doubt, additional testing should be done, in order to validate findings.
