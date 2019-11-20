@@ -1,0 +1,140 @@
+---
+title: "chm_creation_course_script_191119"
+author: "David Langenohl"
+date: "19 11 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include = F}
+### Setup ###
+## Load packages
+libs = c("link2GI",
+         "raster",
+         "lidR",
+         "mapview")
+for(i in libs){
+  if(lapply(i, require, character.only = TRUE) == F){
+    install.packages(i)
+  } else {}
+}
+
+## install package from github
+#devtools::install_github("gisma/uavRst", ref = "master")
+library(uavRst)
+```
+
+```{r}
+### script specific setup ###
+## proj subfolders
+projRootDir<-tempdir()
+
+## source("src/mpg_course_basic_setup.R")
+project_folders = c("data/lidar/level1/",
+                    "data/lidar/level1/example/",
+                    "data/lidar/level2/")   
+
+## create pathes 
+path<-link2GI::initProj(projRootDir = projRootDir,
+                        projFolders = project_folders)
+
+
+## get some colors
+pal = mapview::mapviewPalette("mapviewTopoColors")
+
+## define projection
+proj4 = "+proj=utm +zone=32 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0"
+```
+
+Data handling
+```{r}
+## get the data
+utils::download.file(url="https://github.com/gisma/gismaData/raw/master/uavRst/data/lidR_data.zip",
+                     destfile=paste0(path$data_lidar_level1_example,"chm.zip"))
+
+## unzipping manually
+#unzip(paste0(path$data_lidar_level1_example,"chm.zip"),
+#      exdir = path$data_lidar_level1_example,  overwrite = TRUE)
+
+
+## Get all *.las files of a folder into a list
+las_files = list.files(path$data_lidar_level1_example,
+                       pattern = glob2rx("*.las"),
+                       full.names = TRUE)
+
+## check the extent of the las file
+uavRst::llas2llv0(las_files,path$data_lidar_level1)
+```
+
+Visualizing
+```{r}
+ibrary(lidR)
+las = readLAS(las_files[1])
+las = lasnormalize(las, tin())
+lidR::plot(las,color="Z",colorPalette = pal(100),backend="pcv")
+```
+
+(Re)classification
+```{r}
+# create catalog
+mof_snip <- uavRst::make_lidr_catalog(path = path$data_lidar_level1_example, 
+                                     chunksize = 100, 
+                                     chunkbuffer = 10, 
+                                     proj4=proj4, cores = 4)
+# now we add output options for the ground classification files we want to create 
+lidR::opt_output_files(mof_snip) <- paste0(path$data_lidar_level1_example,"{ID}_csf")
+
+# analyze ground points
+mof_snip_ground_csf <- lidR::lasground(mof_snip, csf())
+```
+
+Digital Surface and Terrain Models (DSM/DTM)
+```{r}
+# add an output option FOR THE dsmtin algorithm
+lidR::opt_output_files(mof_snip_ground_csf) <- paste0(path$data_lidar_level1_example,"{ID}_tin_csf")
+lidR::opt_progress(mof_snip_ground_csf) <- FALSE
+dsm_tin_csf <- lidR::grid_canopy(mof_snip_ground_csf, res = 0.5, lidR::dsmtin(0.5))
+
+# add an output option FOR THE  pitfree algorithm
+lidR::opt_output_files(mof_snip_ground_csf)<-paste0(path$data_lidar_level1_example,"{ID}_pitfree_csf")
+dsm_pitfree_csf <- lidR::grid_canopy(mof_snip_ground_csf, res = 0.5, 
+                                     lidR::pitfree(c(0,2,5,10,15), c(0, 0.5)))
+# add an output option FOR THE  p2r algorithm
+lidR::opt_output_files(mof_snip_ground_csf)<-paste0(path$data_lidar_level1_example,"{ID}_p2r_csf")
+dsm_p2r_csf <- lidR::grid_canopy(mof_snip_ground_csf, res = 0.5, 
+                                lidR::p2r(0.2,na.fill = knnidw()))
+# reclass spurious negative values
+dsm_tin_csf[dsm_tin_csf<minValue(dsm_tin_csf)]<-minValue(dsm_tin_csf)
+dsm_pitfree_csf[dsm_pitfree_csf<minValue(dsm_pitfree_csf)]<-minValue(dsm_pitfree_csf)
+dsm_p2r_csf[dsm_p2r_csf<minValue(dsm_p2r_csf)]<-minValue(dsm_p2r_csf)
+
+#plot different models
+raster::plot(dsm_tin_csf,col=pal(32),main="csf dsmtin 0.5 DSM")
+raster::plot(dsm_p2r_csf,col=pal(32),main="csf p2r 0.5 DSM")
+raster::plot(dsm_pitfree_csf,col=pal(32),main="csf pitfree c(0,2,5,10,15), c(0, 1.5)) 0.5 DSM")
+```
+
+DTM (Digital Terrain Model) generation.
+```{r}
+lidR::opt_output_files(mof_snip_ground_csf)<-paste0(path$data_lidar_level1_example,"{ID}_knn_csf")
+dtm_knn_csf = lidR::grid_terrain(mof_snip_ground_csf, res=0.5,  algorithm = lidR::knnidw(k=50, p=3))
+raster::plot(dtm_knn_csf,col=pal(32),main="csf knnidw terrain model")
+
+#Digital Terrain Model using Delauny Triangulation
+lidR::opt_output_files(mof_snip_ground_csf)<-paste0(path$data_lidar_level1_example,"{ID}_gtin_csf")
+dtm_tin_csf = lidR::grid_terrain(mof_snip_ground_csf, res=0.5,  algorithm = lidR::tin())
+raster::plot(dtm_tin_csf,col=pal(32),main="csf knnidw terrain model")
+```
+
+CHM (Canopy Height Model) generation.
+```{r}
+raster::plot(dsm_p2r_csf - dtm_knn_csf,col=pal(32), main="dsm_p2r_csf - dtm_knn_csf 0.5m CHM")
+raster::plot(dsm_pitfree_csf - dtm_knn_csf, col=pal(32),main="dsm_pitfree_csf - dtm_knn_csf 0.5m CHM")
+raster::plot(dsm_tin_csf - dtm_knn_csf, col=pal(32),main="dsm_tin_csf - dtm_knn_csf 0.5m CHM")
+```
+
+
+

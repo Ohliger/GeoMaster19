@@ -1,0 +1,146 @@
+---
+title: "chm_and_preprocessing_pretty_course_script"
+author: "David Langenohl"
+date: "19 11 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include = F}
+### Start ###
+## Load packages
+libs = c("link2GI",
+         "raster",
+         "lidR",
+         "uavRst")
+
+for(i in libs){
+  if(lapply(i, require, character.only = TRUE) == F){
+    install.packages(i)
+  } else {}
+}
+
+## Set pathes 
+if(Sys.info()[4] == "PC"){
+  username <- "David"
+} else if(Sys.info()[4] == "DESKTOP-LKKGU08"){
+  username <- "hhans"
+} else{print("You need to configure the filepath_base yourself!")}
+
+filepath_base <- paste0("C:/Users/", username, "/Google Drive/Studium/WiSe19/GIS_Fernerkundung")
+
+## Set project specific subfolders
+project_folders <- c("output/", "src/",
+                     "data/", "data/aerial/", "data/data_mof/", "data/grass/", "data/lidar/","data/tmp/",
+                     "data/level0/", "data/level1/", "data/level2/", "data/level3/")
+
+envrmt <- initProj(projRootDir = filepath_base,
+                   projFolders = project_folders, 
+                   path_prefix = "path_", 
+                   global = FALSE)
+```
+
+Define status of switches.
+preprocessing = True/False: defines if preprocessing shall be done; not necessary, if a preprocessed las-file is available (then set to False)
+groundclassification = True/False: set to False, if groundclassification is not nessecary
+```{r}
+# define status of switches
+preprocessing <- TRUE # if set to FALSE, the preprocessing step will be skipped 
+groundclassification <- TRUE
+```
+
+Define projection.
+```{r}
+proj4 = "+proj=utm +zone=32 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0"
+```
+
+Get all .las files within the level0 (= unprocessed data) folder.
+```{r}
+las_files = list.files(envrmt$path_data_lidar,
+                       pattern = glob2rx("*.las"),
+                       full.names = TRUE)
+```
+
+Define Zhang et. al.  paramters (have a look at the lidR documentation).
+```{r}
+if(groundclassification)lground_params <- lidR::util_makeZhangParam(b = 5, dh0 = 6, dhmax = 7, s = 7, max_ws = 100)
+```
+
+Preprocessing.
+```{r}
+if (preprocessing){
+  # preprocessing script to deal with LiDAR data  files as provided by the authority 
+  # all files in a given directory will be checked for correct extent (0,0 coordinate propblem)
+  # and georefrenced according to a given projection system 
+  # optionally  they can be manually ground-classified (class2)
+  # finally a lidR catalog of 200 by 200 meters is created and exported
+  # the result is saved in a 
+  #preprocessing check if extent and projection are correct, write lax file
+  for(fn in las_files){
+    las <-uavRst::correctLas(fn,proj4 = proj4)
+    ##- maybe the ground (return class =2) has to be recalculated
+    #   NOTE this needs a MASSIVE amount of CPU time
+    if (groundclassification) lidR::lasground(las, "pmf",lground_params$ws, lground_params$th)
+    sp::proj4string(las) <- sp::CRS(proj4,doCheckCRSArgs=TRUE)
+    las = lidR::writeLAS(las,paste0(envrmt$path_data_level0,basename(fn)))
+    rlas::writelax(paste0(envrmt$path_data_level0,basename(fn)))
+  }
+  ## setting up the lidR catalog
+  mof <- lidR::catalog(envrmt$path_data_level0)
+  sp::proj4string(mof) <- sp::CRS(proj4) # ETRS89 / UTM zone 32N
+  lidR::opt_cores(mof) <- 4L
+  lidR::opt_chunk_size(mof) = 500
+  lidR::opt_chunk_buffer(mof) <- 10
+  
+  ## Clip catalog to the area of interest retile and reconfigure the catalog
+  xl<-476174.
+  yb<-5631386.
+  xr<-478217. 
+  yt<-5632894.
+  
+  aoimof<- lidR::lasclipRectangle(mof,
+                                  xleft = yl,
+                                  ybottom = yb,
+                                  xright = xr,
+                                  ytop = yt)
+  
+  lidR::writeLAS(aoimof,file.path(envrmt$path_data_level0,"las_mof.las"))
+  writelax(file.path(envrmt$path_data_level0, "las_mof.las"))
+  
+  mof <- lidR::catalog(envrmt$path_dat_level1)
+  sp::proj4string(mof) <- sp::CRS(proj4)
+  lidR::opt_cores(mof) <- 4L
+  lidR::opt_chunk_size(mof) = 200
+  lidR::opt_chunk_buffer(mof) <- 0
+  lidR::opt_output_files(mof) <- paste0(envrmt$path_data_level1,"{ID}")
+  mof = catalog_retile(mof)
+  sp::proj4string(mof) <- sp::CRS(proj4)
+  saveRDS(mof,file= paste0(envrmt$path_data_level1,"las_mof.rds"))
+  
+} else {}
+```
+
+Plot the preprocessed file.
+```{r}
+mof <- readRDS(paste0(envrmt$path_data_level1,"las_mof.rds"))
+
+### let see it
+plot(mof)
+```
+
+Calculation of DSM and DTM.
+```{r}
+# Khosravipour et al. pitfree algorithm
+dsm <- lidR::grid_canopy(mof, res = 0.5, lidR::pitfree(c(0,2,5,10,15), c(0, 2)))
+raster::writeRaster(dsm,file.path(envrmt$path_data,"mof_dsm_all.tif"))
+dtm = lidR::grid_terrain(mof, res=0.5,  algorithm = lidR::kriging(k = 10L))
+raster::writeRaster(dtm,file.path(envrmt$path_data,"mof_dtm_all.tif"))
+raster::plot(dtm)
+raster::plot(dsm)
+##- alternative way to create a CHM is to "normalize' the pointcloud by a given DTM
+#chm<-lasnormalize(mof, dtm)
+```
+

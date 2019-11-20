@@ -1,0 +1,52 @@
+---
+title: "Assignment_04_Viehweger"
+author: "Jonas Viehweger"
+date: "13 11 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+require(reshape2)
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "R:/Studium/Marburg/WS19/data_analysis/")
+```
+
+## Clean the Data
+
+1. Daten einlesen, die letzte Zeile und die ersten 6 weglassen
+2. Variablen gut benennen
+3. "." und "-" zu NA konvertieren
+4. Von wide zu long umbauen
+5. Die Ortsnamen richtig behandeln
+
+
+```{r}
+# 1. Daten einlesen, die letzte Zeile und die ersten 6 weglassen
+df = read.table("data/assignment_04/115-46-4_feldfruechte.csv", 
+                sep = ";", 
+                header = T, 
+                skip = 6,
+                nrows = 8925)
+
+# 2. Variablen gut benennen
+names(df) = c("Year", "ID", "Place", "Winterweizen", "Roggen_Wintermenggetreide", 
+               "Wintergerste", "Sommergerste", "Hafer", "Triticale", "Kartoffeln", 
+               "Zuckerrüben", "Winterraps", "Silomais")
+
+# 3. "." und "-" zu NA konvertieren
+for(c in colnames(df)[4:13]){
+  #lu[, c][lu[, c] == "."] = NA  
+  df[, c][df[, c] %in% c(".","-")] = NA  
+  df[, c] = as.numeric(sub(",", ".", as.character(df[, c])))
+}
+
+# 4. Von wide zu long umbauen
+df_long = melt(df, id.vars = c("Year", "ID", "Place"))
+
+# 5. Die Ortsnamen richtig behandeln
+source("mpg-data-analysis-2019-jonasViehweger/assignment_04/splitPlace.R")
+df_final = splitPlace(df)
+
+head(df_final)
+write.table(df_final, file = "data/assignment_04/feldfruechte_cleaned.csv", sep = ";")
+```
