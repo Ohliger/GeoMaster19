@@ -1,0 +1,58 @@
+---
+title: "tree_crown_segmentation_191119"
+author: "David Langenohl"
+date: "19 11 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+### Setup ###
+## Load packages
+libs = c("link2GI",
+         "raster",
+         "lidR")
+
+for(i in libs){
+  if(lapply(i, require, character.only = TRUE) == F){
+    install.packages(i)
+  } else {}
+}
+
+## Set pathes
+if(Sys.info()[4] == "PC"){
+  username <- "David"
+} else if(Sys.info()[4] == "DESKTOP-LKKGU08"){
+  username <- "hhans"
+} else{print("You need to configure the filepath_base yourself!")}
+
+filepath_base <- paste0("C:/Users/", username, "/Google Drive/Studium/WiSe19/GIS_Fernerkundung")
+
+## Set project specific subfolders
+project_folders <- c("output/", "src/",
+                     "data/", "data/aerial/", "data/data_mof/", "data/grass/", "data/lidar/","data/tmp/")
+
+
+envrmt <- initProj(projRootDir = filepath_base,
+                   projFolders = project_folders, 
+                   path_prefix = "path_", 
+                   global = FALSE)
+```
+
+Tree crown segmentation
+```{r}
+las <- readLAS(paste0(envrmt$path_data_lidar, "U4775632.las"), select = "xyz", filter = "-drop_z_below 0")
+col <- pastel.colors(200)
+
+chm <- grid_canopy(las, 0.5, p2r(0.3))
+ker <- matrix(1,3,3)
+chm <- raster::focal(chm, w = ker, fun = mean, na.rm = TRUE)
+
+ttops <- tree_detection(chm, lmf(4, 2))
+las   <- lastrees(las, dalponte2016(chm, ttops))
+plot(las, color = "treeID", colorPalette = col)
+```
+

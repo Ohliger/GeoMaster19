@@ -1,0 +1,93 @@
+---
+title: "canpoy_height_model_111119"
+author: "David Langenohl"
+date: "11.11.2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include = F}
+#Load packages, needed for the tasks.
+#The needed packages are written into *libs*, the *lapply* loops gives out, if they are installed (if not, do it individually) and, if so, reads #them in.
+
+## Load packages
+libs = c("link2GI",
+         "raster",
+         "lidR")
+lapply(libs, require, character.only = TRUE)
+```
+
+```{r, include = F}
+#Set the projects home directory and the folder pathes. The pathes can than be reached by (e.g) *envrmt$filepath_base*.
+
+## Set pathes -------------------------------------------------------------------
+if(Sys.info()[4] == "PC"){
+  username <- "David"
+} else if(Sys.info()[4] == "DESKTOP-LKKGU08"){
+  username <- "hhans"
+} else{print("You need to configure the filepath_base yourself!")}
+### the if-else-loop sets the filepath depending on the system used ("PC" = PC, "DESKTOP-LKKGU08" = Laptop)
+
+filepath_base <- paste0("C:/Users/", username, "/Google Drive/Studium/WiSe19/GIS_Fernerkundung")
+
+## Set project specific subfolders -------------------------------------------------------------------
+project_folders <- c("output/", "src/",
+                     "data/", "data/aerial/", "data/data_mof/", "data/grass/", "data/lidar/","data/tmp/")
+
+envrmt <- initProj(projRootDir = filepath_base,
+                   projFolders = project_folders, 
+                   path_prefix = "path_", 
+                   global = FALSE)
+```
+
+Read, normalize and plot las-file
+```{r}
+# following this tutorial: https://github.com/Jean-Romain/lidR/wiki/Rasterizing-perfect-canopy-height-models
+
+#las <- readLAS(paste0(envrmt$path_data_lidar, "U4775630_clean.las"))
+las <- readLAS("C:/Users/David/Downloads/lidar_data_GIS_18/MOF_lidar_2018.las")
+las = lasnormalize(las, tin()) #remove the topography from a point cloud; dataset gets normalized with the ground at 0
+plot(las)
+```
+
+Returning the highest z coordinates among all LiDAR returns falling into the corresponding n by n meter area (e.g. 0.5 by 0.5 m)
+```{r, fig.width = 10 ,fig.height = 10}
+chm1 = grid_canopy(las, 0.5, p2r()) 
+plot(chm1, col = height.colors(50))
+```
+
+At this resolution, the resulting CHM (*Canopy height model*) is full of empty pixels and so-called "pits". Theses empty pixels and pits are harmful for consistency of subsequent analyses. A simple improvement proposed by Martin Isenburg in lastools can be obtained by replacing each LiDAR return with a small disk. Since a laser has a width and a footprint, this tweak may simulate this fact. The lidR package implements such a feature too.The resulting CHM no longer contains empty pixels (with p2r = 0.3).
+```{r, fig.width = 10 ,fig.height = 10}
+chm2 = grid_canopy(las, 0.5, p2r(0.3)) #p2r defines the radius of the disks.
+plot(chm2, col = height.colors(50))
+```
+
+The resolution is still coarse. Let's try with a higher resolution (e.g. 0.25 by 0.25 m). If, here, *p2r* is set to 0.3, like before, the data contain "pits" again. So *p2r* needs to be increased. Here there is a trade-off between the subcircle parameter and the resolution to avoid the few occurring empty pixels. An interpolation of empty pixels can also be done (look at parameter na.fill). However, gridding the highest returns will often leave empty pixels in the CHM at high resolution, even after "subcircling" the points. Moreover the CHM will still have pits.
+```{r, fig.width = 10 ,fig.height = 10}
+chm3 = grid_canopy(las, 0.25, p2r(0.7))
+plot(chm3, col = height.colors(50))
+```
+
+Another popular approach to avoid the empty pixel problem consists of the interpolation of first returns with a triangulated irregular network (TIN) and then rasterizing it onto a grid to create the CHM. This can be implemented in lidR with grid_tincanopy. Then a linear interpolation is done within each triangle.
+```{r, fig.width = 10 ,fig.height = 10}
+chm4 = grid_canopy(las, 0.25, dsmtin())
+plot(chm4, col = height.colors(50))
+```
+
+As explained by Martin Isenburg, the result has no more empty pixels but is full of pits because many laser pulses manage to deeply penetrate the canopy before producing the first return. In this context, Khosravipour et al. (2014) [1] developed a "pit-free" algorithm for lastools, and this algorithm is also implemented in lidR. Basically, it consists of several layers of triangulation at different elevations. In the following example at z = 0 (classical triangulation and at 2, 5, 10 and 15 meters.
+```{r, fig.width = 10 ,fig.height = 10}
+chm5 = grid_canopy(las, 0.25, pitfree(thresholds = c(0,2,5,10,15), max_edge = c(0,1)))
+plot(chm5, col = height.colors(50))
+```
+
+This CHM looks nice. No empty pixels and all the pits are gone. However it is still not perfect. Some shallow pits still remain. This maybe can be solved by playing with the max_edge parameter, but let's try another approach.
+
+The pit-free algorithm combined with the subcircling tweak works and is available in lidR and we get a really nice CHM without empty pixels or pits! (takes extremely long to be processed)
+```{r}
+chm6 = grid_canopy(las, 0.25, pitfree(c(0,2,5,10,15), c(0,1), subcircle = 0.2))
+plot(chm6, col = height.colors(50))
+```
+
