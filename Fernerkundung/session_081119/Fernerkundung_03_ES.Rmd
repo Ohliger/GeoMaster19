@@ -1,0 +1,38 @@
+---
+title: "Fernerkundung_03"
+author: "Etienne Stadler"
+date: "17 11 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+library(raster)
+library(sf)
+```
+Satellitenbilder des Uniwaldes einlesen und zusammenführen:
+```{r,eval=FALSE}
+aerial_files <- list.files(file.path("C:/Users/etien/Documents/GitHub/mpg-envinsys-plygrnd/data/aerial/mof_aerial"))
+images <- list()
+
+shape <- st_read(file.path("C:/Users/etien/Documents/GitHub/mpg-envinsys-plygrnd/data/data_mof/mof_vector_data/uwc_kernbereich.shp"))
+
+for(i in 1:length(aerial_files)){
+  image <- brick(file.path("C:/Users/etien/Documents/GitHub/mpg-envinsys-plygrnd/data/aerial/mof_aerial", aerial_files[i]))
+  image <- crop(image,shape)
+  images <- c(images, image)
+}
+
+images$fun <- min
+
+aerial_map_complete <- do.call(mosaic, images)
+
+plotRGB(aerial_map_complete)
+```
+```{r,eval=FALSE, echo=FALSE}
+saveRDS(aerial_map_complete, file.path("C:/Users/etien/Documents/GitHub/mpg-envinsys-plygrnd/data/data_mof","aerial_map_complete.RDS"))
+writeRaster(aerial_map_complete,paste0("C:/Users/etien/Documents/GitHub/mpg-envinsys-plygrnd/data/data_mof","aerial_map_complete.tiff"))
+```
+
