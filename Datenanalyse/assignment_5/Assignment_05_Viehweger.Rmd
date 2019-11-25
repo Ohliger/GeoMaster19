@@ -1,0 +1,75 @@
+---
+title: "Assignment 05 Viehweger"
+author: "Jonas Viehweger"
+date: "21.11.2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+require(car)
+require(snow)
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "R:/Studium/Marburg/WS19/data_analysis/")
+```
+
+## Plot all of the Data
+
+
+```{r}
+
+df = readRDS("data/assignment_05/lu_clean.rds")
+
+ind = df$Settlement
+dep = df$Recreation
+
+plot(ind, dep,
+     xlab = "Settlement Area", ylab = "Recreation Area",
+     main = "Linear Regression of Settlement and Recreation Area")
+
+lmod = lm(dep ~ ind)
+regLine(lmod, col = "red")
+
+par(mfrow = c(1,2))
+
+# Heteroskedastizität
+plot(lmod, which = 1)
+shapiroAll = shapiro.test(lmod$residuals)$p.value
+
+# Normalverteilung
+plot(lmod, which = 2)
+```
+
+Der linke Plot zeigt, dass die Varianz der Residuen nicht homogen ist (Heteroskedastizität) und der rechte Plot zeigt, dass die Werte insgesamt auch nicht gleichverteilt sind.
+
+---
+
+## Subsample the Data
+
+```{r}
+set.seed(20191121)
+
+randomSample = seq(1,100)
+
+# Function to randomly sample and test the sample for normal distribution
+# Returns p-value
+sampleAndTest = function(sampleNumber){
+  samples = df[sample(nrow(df), 50), ]
+  linearMod = lm(samples$Recreation ~ samples$Settlement)
+  shapiro = shapiro.test(linearMod$residuals)
+  return(shapiro$p.value)
+}
+
+pValues = lapply(randomSample, sampleAndTest)
+pValues = as.numeric(pValues)
+
+# Significance Level as suggested by the shapiro.test documentation
+sigLevel = 0.1
+
+sigAmount = length(pValues[pValues > sigLevel])
+maximum = max(pValues)
+
+cat("Not Significant:",sigAmount,"\nMax p-value:    ", maximum)
+
+```
+
+Unter den 100 zufälligen Samples gibt es __`r sigAmount`__, welche bei dem Shapiro-Wilk Test nicht das empfohlene Signifikanzniveau von $\alpha = 0.1$ erreichen und somit im Gegensatz zu der gesamten Datenmenge (p-Wert von nur __`r shapiroAll`__) als gleichverteilt gelten. Das zeigt, dass es sehr wichtig ist eine möglichst große sample size zu erreichen um zu verhindern, dass auf Grund von zu wenigen Datenpunkten Aussagen getroffen werden, die für die Gesamtheit nicht zutreffen.
