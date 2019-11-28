@@ -5,9 +5,9 @@ require(utils)
 
 ## the if-else-loop sets the filepath depending on the system used ("PC" = PC, "DESKTOP-LKKGU08" = Laptop)
 if(Sys.info()[4] == "PC"){
-  filepath_base <- "F:/Studium/WiSe19/GIS_Fernerkundung"
+  filepath_base <- "F:/Studium/WiSe19/Datenanalyse"
 } else if(Sys.info()[4] == "DESKTOP-LKKGU08"){
-  filepath_base <- "F:/Studium/WiSe19/GIS_Fernerkundung"
+  filepath_base <- "F:/Studium/WiSe19/Datenanalyse"
 } else if(Sys.info()[4] == "DESKTOP-J45TOVE"){
   filepath_base = "R:/Studium/Marburg/WS19/mpg-envinsys-plygrnd"
 } else {
@@ -16,23 +16,10 @@ if(Sys.info()[4] == "PC"){
 }
 
 # Set project specific subfolders -------------------------------------------------------------------
-project_folders = c("data/",                                 # data folders
-                    "data/aerial/", "data/grass/", 
-                    "data/data_mof", "data/tmp/",
-                    "data/lidar/",
-                    "data/lidar/level0/",
-                    "data/lidar/level1/",
-                    "data/lidar/level2/",
-                    "data/lidar/level3",
-                    "data/lidar/normalized",
-                    "run/", 
-                    "log/", 
-                    "output/", 
-                    "src/",                # bins and logging
-                    "mpg-envinfosys-teams-2019-david-und-jonas/src/",   # source code
-                    "mpg-envinfosys-teams-2019-david-und-jonas/src/gis/",
-                    "mpg-envinfosys-teams-2019-david-und-jonas/src/remote_sensing/",
-                    "mpg-envinfosys-teams-2019-david-und-jonas/doc/")   # markdown etc.
+project_folders = c("data/",
+                    "tmp/",
+                    "src/",
+                    "output/")
 
 envrmt <- initProj(projRootDir = filepath_base,
                    projFolders = project_folders, 
@@ -45,10 +32,10 @@ envrmt <- initProj(projRootDir = filepath_base,
 #} else {}
 
 # load packages, defined by libs
-install_or_load <- function(packages) {
+lapply(libs, function(packages) {
   k <- packages[!(packages %in% installed.packages()[,"Package"])];
   if(length(k)){install.packages(k);}
   for(package_name in packages){library(package_name,character.only=TRUE, quietly = TRUE);}
-}
+})
 
-install_or_load(libs)
+
