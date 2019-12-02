@@ -32,10 +32,14 @@ envrmt <- initProj(projRootDir = filepath_base,
 #} else {}
 
 # load packages, defined by libs
-lapply(libs, function(packages) {
-  k <- packages[!(packages %in% installed.packages()[,"Package"])];
-  if(length(k)){install.packages(k);}
-  for(package_name in packages){library(package_name,character.only=TRUE, quietly = TRUE);}
-})
+if(exists("libs")) {
+  lapply(libs, function(packages) {
+    k <- packages[!(packages %in% installed.packages()[,"Package"])];
+    if(length(k)){install.packages(k);}
+    for(package_name in packages){library(package_name,character.only=TRUE, quietly = TRUE);}
+  })
+} else {
+  warning("No packages loaded, as libs was not defined")
+}
 
 
