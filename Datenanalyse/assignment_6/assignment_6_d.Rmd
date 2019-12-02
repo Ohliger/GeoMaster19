@@ -1,0 +1,115 @@
+---
+title: "assignment_6"
+author: "David Langenohl"
+date: "28 11 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include = F}
+libs = NULL
+source("../setEnvironment.R")
+```
+
+```{r, collapse=FALSE}
+lmo_cross_validation <- function(path, variable_x, variable_y){
+  
+  data_set <- readRDS(path)
+  data_set <- data_set[-which(is.na(data_set$Settlement)),]
+  data_set$x1 <- data_set[,variable_x]
+  data_set$y1 <- data_set[,variable_y]
+  
+  range <- nrow(data_set)
+  nbr <- nrow(data_set) * 0.8
+
+  cv_sample <- lapply(seq(100), function(i){
+    set.seed(i)
+    smpl <- sample(range, nbr)
+    train <- data_set[smpl,]
+    test <- data_set[-smpl,]
+    lmod <- lm(y1 ~ x1, data = train)
+    pred <- predict(lmod, newdata = test)
+    obsv <- test$y1
+    resid <- obsv - pred
+    ss_obsrv <- sum((obsv - mean(obsv))**2)
+    ss_model <- sum((pred - mean(obsv))**2)
+    ss_resid <- sum((obsv - pred)**2)
+    mss_obsrv <- ss_obsrv / (length(obsv) - 1)
+    mss_model <- ss_model / 1
+    mss_resid <- ss_resid / (length(obsv) - 2)
+    data.frame(pred = pred,
+               obsv = obsv,
+               resid = resid,
+               ss_obsrv = ss_obsrv,
+               ss_model = ss_model,
+               ss_resid = ss_resid,
+               mss_obsrv = mss_obsrv,
+               mss_model = mss_model,
+               mss_resid = mss_resid,
+               r_squared = ss_model / ss_obsrv,
+               no_of_run = i
+    )
+  })
+  cv_sample <- do.call("rbind", cv_sample)
+  
+  ss_obsrv <- sum((cv_sample$obsv - mean(cv_sample$obsv))**2)
+  ss_model <- sum((cv_sample$pred - mean(cv_sample$obsv))**2)
+  ss_resid <- sum((cv_sample$obsv - cv_sample$pred)**2)
+  
+  mss_obsrv <- ss_obsrv / (length(cv_sample$obsv) - 1)
+  mss_model <- ss_model / 1
+  mss_resid <- ss_resid / (length(cv_sample$obsv) - 2)
+  
+  se <- function(x) sd(x, na.rm = TRUE)/sqrt(length(na.exclude(x)))
+  
+  me <- round(mean(cv_sample$pred - cv_sample$obs, na.rm = TRUE), 2)
+  me_sd <- round(se(cv_sample$pred - cv_sample$obs), 2)
+  mae <- round(mean(abs(cv_sample$pred - cv_sample$obs), na.rm = TRUE), 2)
+  mae_sd <- round(se(abs(cv_sample$pred - cv_sample$obs)), 2)
+  rmse <- round(sqrt(mean((cv_sample$pred - cv_sample$obs)^2, na.rm = TRUE)), 2)
+  rmse_sd <- round(se((cv_sample$pred - cv_sample$obs)^2), 2)
+  
+  lmod <- lm(y1 ~ x1, data = data_set)
+  
+  pred_performance <- data.frame(NAME = c(
+                      "cross-validation F value",
+                      "linear model F value", 
+                      "cross-validation r squared",
+                      "linear model r squared",
+                      "cross-validation mean error (ME)",
+                      "cross-validation standard error of ME", 
+                      "cross-validation mean absolute error (MAE)",
+                      "cross-validation standard error of MAE", 
+                      "cross-validation root mean square error (RMSE)",
+                      "cross-validation standard error of RMSE"),
+                      VALUE = c(
+                      round(mss_model / mss_resid, 2),
+                      round(anova(lmod)$'F value'[1], 2),
+                      round(1 - ss_resid / ss_obsrv, 2),
+                      round(summary(lmod)$r.squared, 2),
+                      me,
+                      me_sd,
+                      mae,
+                      mae_sd,
+                      rmse,
+                      rmse_sd))
+  
+  rmse_all <- data.frame(no_of_run = seq(100), rmse = NA)
+  for (i in seq(100)) {
+    rmse.tmp <- round(sqrt(mean((cv_sample$pred[which(cv_sample$no_of_run == paste(i))] - 
+                                   cv_sample$obs[which(cv_sample$no_of_run == paste(i))])^2,na.rm = TRUE)), 2)
+    rmse_all$rmse[i] <- rmse.tmp}
+  
+  barplot(rmse_all$rmse ~ rmse_all$no_of_run, main = "Root mean square error of cross validation (RMSE)", xlab = "no_of_run", ylab = "rmse_value" )
+  print(pred_performance)
+}
+```
+
+```{r}
+lmo_cross_validation(path = paste0(envrmt$path_data, "lu_clean.RDS"), variable_x = "Settlement", variable_y = "Recreation")
+```
+
+
