@@ -1,0 +1,40 @@
+---
+title: "Assignment 06 Viehweger"
+author: "Jonas Viehweger"
+date: "02.12.2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+require(caret)
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "R:/Studium/Marburg/WS19/mpg-envinsys-plygrnd/mpg-data-analysis-2019-jonasViehweger/")
+```
+
+## 
+
+
+```{r}
+
+landUseDF <- read.csv("../data/data_analysis/assignment_07/feldfruechte_cleaned_for_fs.csv", 
+                      header = T, sep = ";", dec = ".")[,4:13]
+
+dfNames <- names(landUseDF)
+dep <- dfNames[1]
+vars <- dfNames[-1]
+#selected <- c("Wintergerste","Kartoffeln","Roggen_Wintermenggetreide","Winterraps")
+selected <- c()
+
+source("assignment_07/fwdFt.R")
+
+repeat{
+  bestVariable <- forward_feature_selection(landUseDF, 
+                                            dep = dep, vars = vars, 
+                                            selected_vars = selected)
+  if(is.logical(bestVariable)) break()
+  selected <- c(selected, bestVariable)
+}
+
+```
+
+Das Modell ist relativ zuverlässig, da die Abweichung der gefitteten Werte im Mittel nur bei 0.9% bis 1.15% liegen.

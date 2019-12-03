@@ -1,0 +1,47 @@
+---
+title: "Assignment 06 Viehweger"
+author: "Jonas Viehweger"
+date: "02.12.2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+require(car)
+require(snow)
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "R:/Studium/Marburg/WS19/mpg-envinsys-plygrnd/mpg-data-analysis-2019-jonasViehweger/")
+```
+
+## 
+
+
+```{r}
+
+df <- readRDS("../data/data_analysis/assignment_05/lu_clean.rds")[,6:7]
+landUseDF <- na.omit(df)
+
+lmod <- lm(Recreation ~ Settlement, data = landUseDF)
+anova(lmod)
+
+range <- nrow(landUseDF)
+trainSize <- nrow(landUseDF) * 0.8
+
+cv_sample <- lapply(seq(100), function(i){
+  set.seed(i+20191202)
+  smpl <- sample(range, trainSize)
+  train <- landUseDF[smpl,]
+  test <- landUseDF[-smpl,]
+  lmod <- lm(Recreation ~ Settlement, data = train)
+  pred <- predict(lmod, newdata = test)
+  obsv <- test$Recreation
+  resid <- obsv - pred
+  rmse <- sqrt(mean((resid)^2))
+  return(rmse)
+})
+cv_sample <- do.call("rbind", cv_sample)
+
+boxplot(cv_sample, ylab="Root Mean Square Error", main="100 cross-validation runs")
+
+```
+
+Das Modell ist relativ zuverlässig, da die Abweichung der gefitteten Werte im Mittel nur bei 0.9% bis 1.15% liegen.
