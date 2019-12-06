@@ -1,51 +1,94 @@
-forward_feature_selection <- function(data, dep, vars, selected_vars = NULL){
-  fwd_fs <- lapply(seq(length(vars)), function(v){
-    if(is.null(selected_vars)){
-      formula <- paste(dep, " ~ ", paste(vars[v], collapse=" + "))
-    } else {
-      formula <- paste(dep, " ~ ", paste(c(selected_vars, vars[v]), collapse=" + "))
+## K-FOLD CROSS VALIDATION ##
+# Implementation of a K-Fold Cross Validation Algorithm
+# Splits the data in k mutually exclusive, even folds and
+# returns the mean RMSE of all k validation runs
+
+k_fold_cv <- function(data, formula, folds){
+  
+  range <- nrow(data)
+  rangeValues <- 1:range
+  trainSize <- range %/% folds
+  
+  cv_sample <- lapply(1:folds, function(fold){
+    set.seed(range+folds)
+    formula <- as.formula(formula)
+    dep <- all.vars(formula)[1]
+    
+    smpl <- sample(rangeValues, trainSize)
+    rangeValues <- rangeValues[-smpl]
+    
+    train <- data[-smpl,]
+    test <- data[smpl,]
+    lmod <- lm(formula, data = train)
+    pred <- predict(lmod, newdata = test)
+    obsv <- test[[dep]]
+    resid <- obsv - pred
+    rmse <- sqrt(mean((resid)^2))
+    return(rmse)
+  })
+  return(mean(cv_sample[[1]]))
+}
+
+
+forward_feature_selection <- function(data, dep, vars, selection_parameter = "AIC"){
+  selected_vars <- NULL
+  performance <- NULL
+  
+  lowerBetter <- selection_parameter %in% c("AIC", "RMSE")
+  higherBetter <- selection_parameter %in% c("Adj_R_sqrd")
+  if(!(lowerBetter | higherBetter)){
+    stop("Selection parameter is not available.")
+  }
+  
+  repeat{
+    
+    ## CALCULATE PERFORMANCE ##
+    # Takes independent variables, calculates linear model and returns 3 different
+    # performance measures for the model. 'additional' parameter is necessary for 
+    # input of selected_vars in the first lapply loop
+    
+    calc_performance <- function(v, additional = NULL){
+      formula <- paste(dep, " ~ ", paste(c(v, additional), collapse=" + "))
+      
+      rmse <- k_fold_cv(data, formula, 3)
+      
+      lmod <- lm(formula, data = data)
+      results <- data.frame(Variable = paste(v, collapse=", "),
+                            Adj_R_sqrd = round(summary(lmod)$adj.r.squared, 4),
+                            RMSE = rmse,
+                            AIC = round(AIC(lmod), 4))
+      return(results)
     }
     
-    # Define training control
-    set.seed(123)
-    train_control <- trainControl(method = "cv", number = 3)
-    # Train the model
-    model <- train(as.formula(formula), data = data, method = "lm",
-                   trControl = train_control)
+    fwd_fs <- lapply(vars, calc_performance, additional = selected_vars)
+    fwd_fs <- do.call("rbind", fwd_fs)
     
-    lmod <- lm(formula, data = data)
-    results <- data.frame(Variable = vars[v],
-                          Adj_R_sqrd = round(summary(lmod)$adj.r.squared, 4),
-                          RMSE = model$results$RMSE,
-                          AIC = round(AIC(lmod), 4))
-    return(results)
-  })
-  fwd_fs <- do.call("rbind", fwd_fs)
-  
-  if(!is.null(selected_vars)){
-    formula <- paste(dep, " ~ ", paste(selected_vars, collapse=" + "))
+    ## VARIABLE SELECTION ##
+    # Check if any of the additional variables improve the prediction.
+    # Pick the predictor with the biggest improvement and append to selected_vars
+    # If there isn't any improvement break() to end the loop.
+    #
+    # 'is.null(current)' check is necessary for the first iteration of the loop.
     
-    # Define training control
-    set.seed(123)
-    train_control <- trainControl(method = "cv", number = 3)
-    # Train the model
-    model <- train(as.formula(formula), data = data, method = "lm",
-                   trControl = train_control)
+    selection_row <- fwd_fs[[selection_parameter]]
+    current <- performance[length(performance)]
     
-    lmod <- lm(formula, data = data)
-    results_selected <- data.frame(Variable = paste0("all: ", paste(selected_vars, collapse=", ")),
-                                   Adj_R_sqrd = round(summary(lmod)$adj.r.squared, 4),
-                                   RMSE = model$results$RMSE,
-                                   AIC = round(AIC(lmod), 4))
-    fwd_fs <- rbind(results_selected, fwd_fs)
+    if(lowerBetter & (any(selection_row < current) | is.null(current))){
+      best_var <- as.character(fwd_fs$Variable[which.min(selection_row)])
+      selected_vars <- append(selected_vars, best_var)
+    } else if(higherBetter & (any(selection_row > current) | is.null(current))){
+      best_var <- as.character(fwd_fs$Variable[which.max(selection_row)])
+      selected_vars <- append(selected_vars, best_var)
+    } else {
+      break()
+    } 
+    
+    # Calculate new performance with the additional predictor
+    results_selected <- calc_performance(selected_vars)
+    performance <- append(performance, results_selected[[selection_parameter]][1])
   }
-  print(fwd_fs)
-  
-  current <- fwd_fs$AIC[1]
-  if(any(fwd_fs$AIC < current)){
-    best_var <- as.character(fwd_fs$Variable[which(fwd_fs$AIC == min(fwd_fs$AIC))])
-    return(best_var)
-  } else {
-    return(F)
-  }
+
+  var_perf <- data.frame(Added.Variable = selected_vars,
+                         Performance = performance)
+  return(var_perf)
 }
