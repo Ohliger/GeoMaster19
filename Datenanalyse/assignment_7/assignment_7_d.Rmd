@@ -1,0 +1,240 @@
+---
+title: "assignment_7"
+author: "David Langenohl"
+date: "09.12.2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include = F}
+rm(list = ls())
+source("../setEnvironment.R")
+```
+
+Variable-Selection-Function with following inputs:
+- data = dataset, that shall be analysed  
+- dep = dependend variables (y)  
+- var = independent/describing variables, from that the best ones shall be found  
+- AIC = set to TRUE, if best variables should be searched by *forward feature selection* (looking for the smalles AIC) [default = TRUE]  
+- RMSE = set to TRUE, if best variables should be searched by *nfold cross validation* (looking for smallest AIC) [default = FALSE]  
+- nfolds = number of folds to use in nfold-cross-validation [default = 3]  
+
+```{r}
+var_selection <- function(data, dep, vars,  AIC = T, RMSE = F, nfolds = 3){
+  feature_selection <- function(data, dep, vars, nfolds = 3, AIC = T, RMSE = F,  selected_vars = NULL){
+    if(c(AIC == T & RMSE == F) | c(AIC == F & RMSE == T)){
+      
+      results <- data.frame(Variable = NULL,
+                            Adj_R_sqrd = NULL,
+                            AIC = NULL,
+                            RMSE = NULL,
+                            RMSE_SD = NULL)
+      
+      for(v in seq(length(vars))){
+        if(is.null(selected_vars)){
+          formula <- paste(dep, " ~ ", paste(vars[v], collapse=" + "))
+        } else {
+          formula <- paste(dep, " ~ ", paste(c(selected_vars, vars[v]), collapse=" + "))
+        }
+        
+        lmod <- lm(formula, data = data)
+        
+        se <- function(x) sd(x, na.rm = TRUE)/sqrt(length(na.exclude(x)))
+        
+        set.seed(v)
+        data_random <- data[sample(nrow(data)),] #randomly shuffle data
+        data_random$fold <- cut(seq(1,nrow(data_random)),breaks = nfolds,labels = FALSE) #create a fold coloumn
+        tmp_df <- NULL
+        for (i in seq(nfolds)){
+          smpl <- which(data_random$fold == i)
+          train <- data_random[smpl,]
+          test <- data_random[-smpl,]
+          lmod_cv <- lm(formula, data = train)
+          pred <- predict(lmod_cv, newdata = test)
+          obsv <- test[,dep]
+          tmp <- data.frame(rmse = round(sqrt(mean((pred - obsv)^2, na.rm = TRUE)), 2),
+                            rmse_sd = round(se((pred - obsv)^2), 2))
+          tmp_df <- rbind(tmp_df, tmp)
+        }
+        
+        results_tmp <- data.frame(Variable = vars[v],
+                                  Adj_R_sqrd = round(summary(lmod)$adj.r.squared, 4),
+                                  AIC = round(AIC(lmod), 4),
+                                  RMSE = mean(tmp_df$rmse),
+                                  RMSE_SD = mean(tmp_df$rmse_sd))
+        
+        results <- rbind(results, results_tmp)
+      }
+      
+      if(!is.null(selected_vars)){
+        formula <- paste(dep, " ~ ", paste(selected_vars, collapse=" + "))
+        lmod <- lm(formula, data = data)
+        sel_tmp_df <- NULL
+        for (i in seq(nfolds)){
+          smpl <- which(data_random$fold == i)
+          train <- data_random[smpl,]
+          test <- data_random[-smpl,]
+          lmod_cv <- lm(formula, data = train)
+          pred <- predict(lmod_cv, newdata = test)
+          obsv <- test[,dep]
+          tmp <- data.frame(rmse = round(sqrt(mean((pred - obsv)^2, na.rm = TRUE)), 2),
+                            rmse_sd = round(se((pred - obsv)^2), 2))
+          sel_tmp_df <- rbind(sel_tmp_df, tmp)
+        }
+        
+        results_selected <- data.frame(Variable = paste0("all: ", paste(selected_vars, collapse=", ")),
+                                       Adj_R_sqrd = round(summary(lmod)$adj.r.squared, 4),
+                                       AIC = round(AIC(lmod), 4),
+                                       RMSE = mean(sel_tmp_df$rmse),
+                                       RMSE_SD = mean(sel_tmp_df$rmse_sd))
+        results <- rbind(results_selected, results)
+      }
+      
+      
+      if(AIC == T & RMSE == F){
+        best_var <- as.character(results$Variable[which(results$AIC == min(results$AIC))]) 
+      }
+      
+      else if(AIC == F & RMSE == T){
+        best_var <- as.character(results$Variable[which(results$RMSE == min(results$RMSE))]) 
+      }
+      
+      return(c(best_var, results))
+    }
+    
+    ## if both, FFS and CV, are set to True or False; print warnings
+    else if(c(AIC == T & RMSE == T) | c(AIC == F & RMSE == F)){
+      if(AIC == T & RMSE == T){
+        warning("Two methods defined. Please choose only one of AIC = True or RMSE = True")
+      }
+      
+      else if(AIC == F & RMSE == F){
+        warning("No method defined. Please choose AIC = True or RMSE = True")
+      }
+    }
+  }
+  
+  if(AIC == T & RMSE == F){
+    selected_vars <- NULL
+    best_var <- feature_selection(data = data, dep = dep, vars = vars, nfolds = nfolds)
+    results_run <- data.frame(best_var[2:6])
+    results_run$Variable <- as.character(results_run$Variable)
+    results_run_old <- results_run
+    act_var <- best_var[[1]] # which variable was best? 
+    next_vars <- as.character(best_var[[2]][-which(best_var[[2]] == act_var)]) # take other variables for next run
+    next_vars <- next_vars[-1]
+    selected_vars <- c(selected_vars, act_var)
+    
+    i <- 1
+    output <- data.frame(no_of_variables = i,
+                         AIC = results_run$AIC[which(results_run$AIC == min(results_run$AIC))])
+    
+    
+    while(any(results_run$AIC[2:nrow(results_run)] < results_run$AIC[1])){
+      best_var <- feature_selection(data = data, dep = dep, vars = next_vars, selected_vars = selected_vars, nfolds = nfolds)
+      results_run <- data.frame(best_var[2:6])
+      results_run$Variable <- as.character(results_run$Variable)
+      
+      # implement if-statement, that breaks loop, if AIC becomes getting bigger than the last one
+      if(results_run$AIC[which(results_run$AIC == min(results_run$AIC))] 
+         < results_run_old$AIC[which(results_run_old$AIC == min(results_run_old$AIC))]) {
+        results_run_old <- results_run
+      }
+      else if(results_run$AIC[which(results_run$AIC == min(results_run$AIC))] 
+         > results_run_old$AIC[which(results_run_old$AIC == min(results_run_old$AIC))]) {break}
+      
+      act_var <- best_var[[1]]
+      next_vars <- as.character(best_var[[2]][-which(best_var[[2]] == act_var)])
+      next_vars <- next_vars[-1]
+      if(length(next_vars) == 0){break} #quits loop, if all variables are used as selected variables
+      selected_vars <- c(selected_vars, act_var)
+      
+      i <- c(i+1)
+      output_tmp <- data.frame(no_of_variables = i,
+                         AIC = results_run$AIC[which(results_run$AIC == min(results_run$AIC))])
+      output <- rbind(output, output_tmp)
+    }
+    
+    best_result <- data.frame(Variables = paste(selected_vars, collapse="; "),
+                              AIC = results_run$AIC[which(results_run$AIC == min(results_run$AIC))])
+    
+    plot(AIC ~ no_of_variables, data = output, type = "b")
+  }
+  
+  else if(AIC == F & RMSE == T){
+    selected_vars <- NULL
+    best_var <- feature_selection(data = data, dep = dep, vars = vars, nfolds = nfolds)
+    results_run <- data.frame(best_var[2:6])
+    results_run$Variable <- as.character(results_run$Variable)
+    results_run_old <- results_run
+    act_var <- best_var[[1]] # which variable was best? 
+    next_vars <- as.character(best_var[[2]][-which(best_var[[2]] == act_var)]) # take other variables for next run
+    next_vars <- next_vars[-1]
+    selected_vars <- c(selected_vars, act_var)
+    
+    i <- 1
+    output <- data.frame(no_of_variables = i,
+                         RMSE = results_run$RMSE[which(results_run$RMSE == min(results_run$RMSE))])
+    
+    while(any(results_run$RMSE[2:nrow(results_run)] < results_run$RMSE[1])){
+      best_var <- feature_selection(data = data, dep = dep, vars = next_vars, selected_vars = selected_vars, nfolds = nfolds)
+      results_run <- data.frame(best_var[2:6])
+      results_run$Variable <- as.character(results_run$Variable)
+      
+      # implement if-statement, that breaks loop, if RMSE becomes getting bigger than the last one
+      if(results_run$RMSE[which(results_run$RMSE == min(results_run$RMSE))] 
+         < results_run_old$RMSE[which(results_run_old$RMSE == min(results_run_old$RMSE))]) {
+        results_run_old <- results_run
+      }
+      else if(results_run$RMSE[which(results_run$RMSE == min(results_run$RMSE))] 
+         > results_run_old$RMSE[which(results_run_old$RMSE == min(results_run_old$RMSE))]) {break}
+      
+      act_var <- best_var[[1]]
+      next_vars <- as.character(best_var[[2]][-which(best_var[[2]] == act_var)])
+      next_vars <- next_vars[-1]
+      if(length(next_vars) == 0){break} #quits loop, if all variables are used as selected variables
+      selected_vars <- c(selected_vars, act_var)
+      
+      i <- c(i+1)
+      output_tmp <- data.frame(no_of_variables = i,
+                         RMSE = results_run$RMSE[which(results_run$RMSE == min(results_run$RMSE))])
+      output <- rbind(output, output_tmp)
+    }
+        
+    best_result <- data.frame(Variables = paste(selected_vars, collapse="; "),
+                              RMSE = results_run$RMSE[which(results_run$RMSE == min(results_run$RMSE))])
+    
+    plot(RMSE ~ no_of_variables, data = output, type = "b")
+  }
+  print(best_result)
+  return(best_result)
+
+}
+```
+  
+    
+Example data.
+```{r}
+data <- read.table(paste0(envrmt$path_data, "feldfruechte_cleaned.csv"), sep = ";")
+dep <- "Winterweizen"
+vars <- c(names(data)[5:length(names(data))])
+nfolds <- 3 # 3-fold cross validation
+```
+  
+    
+Use *forward feature selection*
+```{r}
+AIC_feature_selection <- var_selection(data = data, dep = dep, vars = vars, AIC = T)
+```
+  
+    
+Use *3-fold cross validation*
+```{r}
+RMSE_feature_selection <- var_selection(data = data, dep = dep, vars = vars, RMSE = T, AIC = F)
+```
+
+
+
