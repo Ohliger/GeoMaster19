@@ -1,0 +1,81 @@
+---
+title: "HA7_Carl"
+author: "Carl Ziereisen"
+date: "5 12 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Step0: Working enviroment,load packages
+
+```{r, echo=FALSE,eval=FALSE}
+source(file.path(envimaR::alternativeEnvi(root_folder = "~/1.Semester/mpg-envinsys-plygrnd",
+                                          alt_env_id = "COMPUTERNAME",
+                                          alt_env_value = "PCRZP",
+                                          alt_env_root_folder = "F:/Uni Marburg/1.Semester/mpg-envinsys-plygrnd"),
+                 "src/Ordnerverlinkung_Skript.R"))
+
+# install.packages("caret")
+# library(caret)
+```
+
+Step1:
+Please write an R function which implements a forward feature selection approach for a multiple linear regression model. The function should have two options for the performance measure: (i) the Akaike information criteria (AIC) and (ii) a leave-many-out cross-validation strategy which uses three folds.
+
+```{r, eval=FALSE}
+source(file.path("F:/Uni Marburg/1.Semester/mpg-envinsys-plygrnd/mpg-data-analysis-2019-CarlZiereisen/src", "HA7_forward fs.R"))
+
+```
+
+
+Step2:
+Test the function by predicting the winter wheat yield on the basis of any other yield included in your crop dataset.
+
+```{r}
+ff <- read.csv("F:/Uni Marburg/1.Semester/mpg-envinsys-plygrnd/data/tmp/feldfruechte_cleaned_for_fs.csv", 
+               header = TRUE, sep = ";", dec = ".")[,4:13]
+
+dfName <- names(ff)
+dep <- dfName[1]
+vars <- dfName[-1]
+selected <- c()
+
+```
+
+
+Step3:
+Write an Rmd file with html output which tests the functionality of the above functions and graphically shows the performance of the individual models computed during the feature selection with an increasing order of variables used for the prediction. The Rmd file should also print the performance and the variables used within the final model in the end.
+
+```{r}
+tabelle <- c()
+performance <- c()
+selected <- c()
+while (!is.logical(tabelle)){
+  performance <- rbind(performance,tabelle)
+  print(tabelle)
+  selected <- c(selected,tabelle[1])
+  tabelle <- forward_feature_selection(ff, dep=dep, vars=vars, selected_vars = selected, stat_indc = "RMSE")
+}
+
+
+plot(performance[,2],type = "b" , ylab= "RMSE", xlab = "Getreideindex")
+```
+
+```{r}
+tabelle <- c()
+performance <- c()
+selected <- c()
+while (!is.logical(tabelle)){
+  performance <- rbind(performance,tabelle)
+  print(tabelle)
+  selected <- c(selected,tabelle[1])
+  tabelle <- forward_feature_selection(ff, dep=dep, vars=vars, selected_vars = selected)
+}
+
+
+plot(performance[,2],type = "b" , ylab= "AIC", xlab = "Getreideindex")
+```
+
