@@ -40,28 +40,31 @@ forward_feature_selection <- function(data, dep, vars, selection_parameter = "AI
     stop("Selection parameter is not available.")
   }
   
+  ## CALCULATE PERFORMANCE ##
+  # Takes independent variables, calculates linear model and returns 3 different
+  # performance measures for the model. 
+  
+  calc_performance <- function(v, additional = NULL){
+    formula <- paste(dep, " ~ ", paste(c(v, additional), collapse=" + "))
+    
+    rmse <- k_fold_cv(data, formula, 3)
+    
+    lmod <- lm(formula, data = data)
+    results <- data.frame(Variable = paste(v, collapse=", "),
+                          Adj_R_sqrd = round(summary(lmod)$adj.r.squared, 4),
+                          RMSE = rmse,
+                          AIC = round(AIC(lmod), 4))
+    return(results)
+  }
+  
   repeat{
     
-    ## CALCULATE PERFORMANCE ##
-    # Takes independent variables, calculates linear model and returns 3 different
-    # performance measures for the model. 'additional' parameter is necessary for 
-    # input of selected_vars in the first lapply loop
-    
-    calc_performance <- function(v, additional = NULL){
-      formula <- paste(dep, " ~ ", paste(c(v, additional), collapse=" + "))
-      
-      rmse <- k_fold_cv(data, formula, 3)
-      
-      lmod <- lm(formula, data = data)
-      results <- data.frame(Variable = paste(v, collapse=", "),
-                            Adj_R_sqrd = round(summary(lmod)$adj.r.squared, 4),
-                            RMSE = rmse,
-                            AIC = round(AIC(lmod), 4))
-      return(results)
-    }
+    # Calculate the model performance with all remaining independet 
+    # variables added one by one to the current model
     
     fwd_fs <- lapply(vars, calc_performance, additional = selected_vars)
     fwd_fs <- do.call("rbind", fwd_fs)
+    
     
     ## VARIABLE SELECTION ##
     # Check if any of the additional variables improve the prediction.
@@ -74,21 +77,26 @@ forward_feature_selection <- function(data, dep, vars, selection_parameter = "AI
     current <- performance[length(performance)]
     
     if(lowerBetter & (any(selection_row < current) | is.null(current))){
-      best_var <- as.character(fwd_fs$Variable[which.min(selection_row)])
-      selected_vars <- append(selected_vars, best_var)
+      best_row <- which.min(selection_row)
     } else if(higherBetter & (any(selection_row > current) | is.null(current))){
-      best_var <- as.character(fwd_fs$Variable[which.max(selection_row)])
-      selected_vars <- append(selected_vars, best_var)
+      best_row <- which.max(selection_row)
     } else {
       break()
     } 
     
-    # Calculate new performance with the additional predictor
-    results_selected <- calc_performance(selected_vars)
-    performance <- append(performance, results_selected[[selection_parameter]][1])
+    best_var <- as.character(fwd_fs$Variable[best_row])
+    selected_vars <- append(selected_vars, best_var)
+    vars <- vars[!best_row]
+    
+    best_perf <- selection_row[best_row]
+    performance <- append(performance, best_perf)
+    
   }
 
   var_perf <- data.frame(Added.Variable = selected_vars,
                          Performance = performance)
   return(var_perf)
 }
+
+
+

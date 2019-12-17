@@ -1,0 +1,84 @@
+---
+title: "Assignment 08: Model Tuning"
+author: "Jonas Viehweger"
+date: "15.12.2019"
+output: html_document
+---
+---
+
+```{r setup, include=FALSE}
+require(mgcv)
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "R:/Studium/Marburg/WS19/mpg-envinsys-plygrnd/mpg-data-analysis-2019-jonasViehweger/")
+```
+
+## SETUP
+
+```{r}
+# Leave many out with GAM as metric
+lma_cv <- function(data, knot, formula, runs = 100, split = 0.8){
+  range <- nrow(data)
+  trainSize <- nrow(data) * split
+  pars_form <- as.formula(formula)
+  dep <- all.vars(pars_form)[1]
+  
+  rmse <- lapply(seq(runs), function(i){
+    set.seed(i+20191215)
+    smpl <- sample(range, trainSize)
+    train <- data[smpl,]
+    test <- data[-smpl,]
+    gammod <- gam(pars_form, data = train)
+    gampred <- predict(gammod, test)
+    obsv <- test[[dep]]
+    resid <- obsv - gampred
+    rmse <- sqrt(mean((resid)^2))
+    return(rmse)
+  })
+  rmse <- as.numeric(rmse)
+  gammod <- gam(pars_form, data = data)
+  
+  results <- data.frame(Knots = knot,
+                        Adj_R_sqrd = summary(gammod)$r.sq,
+                        RMSE = mean(rmse),
+                        sd = sd(rmse))
+  return(results)
+}
+
+data <- read.table("../data/data_analysis/assignment_03/hessen_holzeinschlag_1997-2014.csv", 
+                 sep = ";", 
+                 header = T, 
+                 skip = 4, 
+                 nrows = 18)
+
+knots <- seq(3, 13)
+
+rmses <- lapply(knots, function(knot){
+  formula <- paste0("Buche ~ s(Eiche, k = knot, fx = TRUE)")
+  result <- lma_cv(data, knot, formula)
+})
+```
+
+## VISUALIZATION
+
+```{r}
+# Build data frame
+results <- do.call(rbind,rmses)
+
+# Normalize RMSE
+rmse_max <- max(results$RMSE)
+results$RMSE <- results$RMSE/rmse_max
+results$sd <- results$sd/rmse_max
+results$pos_sd <- results$RMSE + results$sd
+results$neg_sd <- results$RMSE - results$sd
+
+# Visualize as line graphs
+plot(range(c(3,13)), range(c(0,2)), type="n", xlab="Knots",
+   ylab="Performance" )
+lines(results$Knots, results$Adj_R_sqrd, type="b", col = "blue", lty = 3, pch = 2)
+lines(results$Knots, results$pos_sd, type="l", col = "gray", lty = 3)
+lines(results$Knots, results$neg_sd, type="l", col = "gray", lty = 3)
+lines(results$Knots, results$RMSE, type="b", col = "red")
+
+legend("topleft", legend = c("R Squared","RMSE","RMSE SD"), col = c("blue", "red", "gray"), lty = c(2,1,3))
+
+```
