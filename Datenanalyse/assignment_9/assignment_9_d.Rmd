@@ -1,0 +1,109 @@
+---
+title: "assignment_9"
+author: "David Langenohl"
+date: "8.01.2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include = F}
+rm(list = ls())
+libs = c("forecast")
+source("../setEnvironment.R")
+```
+
+```{r}
+hist <- read.table(paste0(envrmt$path_data, "prec_hourly_station_03164_20060701_20181231.txt"), sep = ";", dec = ".", header = T)
+rec <- read.table(paste0(envrmt$path_data, "prec_hourly_station_03164_20180707_20200107.txt"), sep = ";", dec = ".", header = T)
+
+## merge datasets, tidy them up and convert date-formant
+prec.all <- rbind(hist, rec)
+prec.all <- prec.all[which(duplicated(prec.all$MESS_DATUM) == F),] #remove duplicated entries
+prec.all <- prec.all[,c(2,4)] #remove not needed coloumns
+colnames(prec.all) <- c("date", "precipitation_mm") #rename coloumns
+
+prec.all$date <- strptime(paste0(prec.all$date, "00"), format = "%Y%m%d%H%M") #convert "date" column to a date-format including year, month, day, hour, minute
+
+## aggregate hourly precipitation to monthly precipitation
+prec.all$agg_ym <- substr(prec.all$date, 1, 7) #add coloumn that contains a substring of "date" that contains places 1 to 7 = year and month
+prec.monthly <- aggregate(prec.all$precipitation_mm, by = list(prec.all$agg_ym), FUN = mean)
+colnames(prec.monthly) <- c("date", "precipitation_mm")
+
+## split the data into data from 2006 to 2017 for fitting the model and data from 2018 and 2019 for testing the model
+prec.monthly.fit <- prec.monthly[which(substr(prec.monthly$date, 1, 4) < 2018),] #years 2006-2017
+prec.monthly.test <- prec.monthly[which(substr(prec.monthly$date, 1, 4) >= 2018),] #years 2018, 2019
+prec.monthly.test <- prec.monthly.test[-nrow(prec.monthly.test),] #remove january 2020 as it is not needed
+
+## create a data frame containing all possible combinations of the parameters p, d, q, ps, ds, qs
+pars <- expand.grid(p = seq(0,5), #number of considered time lags in auto-regressive model
+                    d = seq(0, 2), #number of differences (to reach stationarity)
+                    q = seq(0, 5), #number of considered time lags in AM model
+                    ps = seq(0, 2), #seasonal p
+                    ds = seq(0, 2), #seasonal d
+                    qs = seq(0, 2)) #seasonal q
+
+## find best model
+rmse.all <- NA
+for(i in nrow(prec.monthly.fit)){
+  arima.tmp <- arima(prec.monthly.fit$precipitation_mm,
+              order = c(pars[i, "p"], pars[i, "d"], pars[i, "q"]),
+              seasonal = c(pars[i, "ps"], pars[i, "ds"], pars[i, "qs"]))
+  pred.tmp <- predict(arima.tmp, n.ahead = 24)
+  rmse.tmp = mean(round(sqrt(c(pred.tmp$pred - prec.monthly.test$precipitation_mm)^2), 2))
+  
+  if(is.na(rmse.all)==F) {
+  rmse.all <- rbind(rmse.all, cbind(rmse.tmp, pars[i,]))}
+  else {rmse.all <- cbind(rmse.tmp, pars[i,])}
+}
+
+best.fit <- rmse.all[which(rmse.all$rmse.tmp == min(rmse.all$rmse.tmp)),-1]
+
+arima.best <- arima(prec.monthly.fit$precipitation_mm,
+              order = c(best.fit$p, best.fit$d, best.fit$q),
+              seasonal = c(best.fit$ps, best.fit$ds, best.fit$qs))
+
+arima.best.sum <- summary(arima.best)
+
+arima.best.out <- cbind(best.fit, arima.best$aic, arima.best.sum[2])
+
+## auto.arima
+#create a time series out of the data
+prec.monthly.ts <- ts(prec.monthly.fit$precipitation_mm, 
+                      start = c(2006, 7),
+                      end = c(2017, 12),
+                      frequency = 12)
+
+
+arima.auto <- forecast::auto.arima(prec.monthly.ts,
+                                   max.p = 5,
+                                   max.d = 2,
+                                   max.q = 5,
+                                   stationary = T,
+                                   seasonal = T)
+
+arima.auto.sum <- summary(arima.auto)
+
+## compare both models
+results <- data.frame(aic = c(arima.best$aic, arima.auto$aic), rmse = c( arima.best.sum[2], arima.auto.sum[2]))
+rownames(results) <- c("arima", "auto_arima")
+
+## visualization
+pred.best <- predict(arima.best, n.ahead = 24)
+pred.auto <- predict(arima.auto, n.ahead = 24)
+
+plot(prec.monthly$precipitation_mm, type = "l")
+lines(pred.best$pred, col = "red")
+lines(pred.best$pred + pred.best$se, col = "grey")
+lines(pred.best$pred - pred.best$se, col = "grey")
+
+plot(prec.monthly$precipitation_mm, type = "l")
+lines(pred.auto$pred, col = "red")
+lines(pred.auto$pred + pred.auto$se, col = "grey")
+lines(pred.auto$pred - pred.auto$se, col = "grey")
+
+results
+```
+
