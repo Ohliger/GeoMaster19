@@ -5,10 +5,16 @@ require(utils)
 
 ## the if-else-loop sets the filepath depending on the system used ("PC" = PC, "DESKTOP-LKKGU08" = Laptop)
 if(Sys.info()[4] == "PC"){
-  filepath_base <- "F:/Studium/WiSe19/Datenanalyse"
+  filepath_base <- "F:/Studium/WiSe19/GIS_Fernerkundung"
+} else if(Sys.info()[4] == "david-nb"){
+  filepath_base <- "/media/david/SD_128/Studium/WiSe19/GIS_Fernerkundung"
+} else if(Sys.info()[4] == "david-pc"){
+  filepath_base <- "/media/david/SD_128/Studium/WiSe19/GIS_Fernerkundung"
 } else if(Sys.info()[4] == "DESKTOP-LKKGU08"){
-  filepath_base <- "F:/Studium/WiSe19/Datenanalyse"
+  filepath_base <- "D:/Studium/WiSe19/GIS_Fernerkundung"
 } else if(Sys.info()[4] == "DESKTOP-J45TOVE"){
+  filepath_base = "R:/Studium/Marburg/WS19/mpg-envinsys-plygrnd"
+} else if(Sys.info()[4] == "DESKTOP-TFVSFEG"){
   filepath_base = "R:/Studium/Marburg/WS19/mpg-envinsys-plygrnd"
 } else {
   warning("No base path configured. The working environment will be set up in ", getwd())
